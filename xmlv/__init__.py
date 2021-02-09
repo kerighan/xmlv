@@ -23,7 +23,7 @@ class XMLV:
         attributes, G = to_networkx(root)
         return attributes, G
     
-    def fit(self, attributes, target="category"):
+    def fit_transform(self, attributes, target="category"):
         X = []
         for col in ["tag", "class", "property"]:
             x, vectorizer = fit_transform(attributes[col], min_df=self.min_df)
