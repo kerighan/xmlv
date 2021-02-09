@@ -1,5 +1,6 @@
 import re
 import requests
+import pickle
 import pandas as pd
 from lxml import html, etree
 import networkx as nx
@@ -15,6 +16,18 @@ class XMLV:
         self.min_df = min_df
         self.vectorize_text = vectorize_text
         self.text_min_df = text_min_df
+    
+    def save(self, filename):
+        import dill
+        with open(filename, "wb") as f:
+            dill.dump(self, f)
+    
+    @staticmethod
+    def load(filename):
+        import dill
+        with open(filename, "rb") as f:
+            xmlv = dill.load(f)
+        return xmlv
 
     def get(self, url):
         r = requests.get(url)

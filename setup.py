@@ -9,5 +9,5 @@ setuptools.setup(
     description="XMLVectorizer turn elements of a web pages to numpy vectors",
     packages=setuptools.find_packages(),
     include_package_data=True,
-    install_requires=["scikit-learn", "networkx", "pandas", "numpy"]
+    install_requires=["scikit-learn", "networkx", "pandas", "numpy", "dill"]
 )
