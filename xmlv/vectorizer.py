@@ -1,6 +1,7 @@
 from sklearn.feature_extraction.text import CountVectorizer
 import re
 
+
 def fit_transform(series, min_df=1, tokenize=False):
     if not tokenize:
         vectorizer = CountVectorizer(
