@@ -119,28 +119,18 @@ def get_attributes(element_id, element):
 
 
 def to_networkx(root):
+    elements = set([
+        elem
+        for elem in root.iter()
+        if not isinstance(elem, html.HtmlComment)
+    ])
+    elements_id = set()
+
     attributes = []
-    visited = set()
-    edges = set()
-
-    def dfs(element, before=None):
-        if isinstance(element, html.HtmlComment):
-            return
-
-        element_id = str(element)
-        if element_id not in visited:
-            attributes.append(get_attributes(element_id, element))
-            visited.add(element_id)
-
-        if before is not None:
-            couple = tuple((before, element_id))
-            edges.add(couple)
-
-        for child in element.getchildren():
-            dfs(child, element_id)
-
-
-    dfs(root)
+    for elem in elements:
+        element_id = str(elem)
+        elements_id.add(element_id)
+        attributes.append(get_attributes(element_id, elem))
     attributes = pd.DataFrame(attributes)
     attributes.columns = [
         "index", "tag", "id",
@@ -148,22 +138,21 @@ def to_networkx(root):
         "content", "href"]
 
     G = nx.Graph()
-    G.add_edges_from(edges)
-    pos = nx.spectral_layout(G)
+    G.add_nodes_from(elements_id)
+    edges = []
+    for source in elements:
+        source_id = str(source)
+        for target in source.getchildren():
+            target_id = str(target)
+            if target_id in elements_id and source_id in elements_id:
+                edges.append((source_id, target_id))
+        
+        parent = source.getparent()
+        parent_id = str(parent)
+        if parent_id in elements_id and source_id in elements_id:
+            edges.append((parent_id, source_id))
+    G.add_edges_from(set(edges))
 
-    id2tag = attributes.set_index("index").tag.to_dict()
-    id2class = attributes.set_index("index")["class"].to_dict()
-    node_color = []
-    for node in G.nodes:
-        tag = id2tag[node]
-        class_ = id2class[node]
-        if tag == "p" and "article" in class_:
-            node_color.append(1)
-        elif tag == "html":
-            node_color.append(2)
-        else:
-            node_color.append(0)
-    
     # neighbors = {}
     # for node in G.nodes:
     #     neighbors[node] = list(G.neighbors(node))
