@@ -6,16 +6,23 @@ from lxml import html, etree
 import networkx as nx
 from io import StringIO
 import numpy as np
-from .vectorizer import fit_transform
+from .vectorizer import fit_transform, link_fit_transform
 from sklearn.feature_extraction.text import CountVectorizer
 
 
 class XMLV:
-    def __init__(self, min_df=2, vectorize_text=False, text_min_df=5):
+    def __init__(
+        self,
+        min_df=5,
+        vectorize_text=False,
+        vectorize_link=False,
+        attr_min_df=2
+    ):
         self.vectorizers = {}
         self.min_df = min_df
         self.vectorize_text = vectorize_text
-        self.text_min_df = text_min_df
+        self.vectorize_link = vectorize_link
+        self.attr_min_df = attr_min_df
     
     def save(self, filename):
         import dill
@@ -38,18 +45,30 @@ class XMLV:
     
     def fit_transform(self, attributes, target="category"):
         X = []
+        # vectorize tag, class and property
         for col in ["tag", "class", "property"]:
-            x, vectorizer = fit_transform(attributes[col], min_df=self.min_df)
+            x, vectorizer = fit_transform(
+                attributes[col], min_df=self.attr_min_df)
             self.vectorizers[col] = vectorizer
             X.append(x)
+
         # vectorize text if necessary
         if self.vectorize_text:
             x, vectorizer = fit_transform(
                 attributes["text"],
-                min_df=self.text_min_df,
+                min_df=self.min_df,
                 tokenize=True)
             self.vectorizers["text"] = vectorizer
             X.append(x)
+
+        # vectorize text if necessary
+        if self.vectorize_link:
+            x, vectorizer = link_fit_transform(
+                attributes["href"],
+                min_df=self.attr_min_df)
+            self.vectorizers["href"] = vectorizer
+            X.append(x)
+
         X = np.concatenate(X, axis=-1)
         
         if target in attributes.columns:
