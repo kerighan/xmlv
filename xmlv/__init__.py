@@ -43,7 +43,10 @@ class XMLV:
         attributes, G = to_networkx(root)
         return attributes, G
     
-    def fit_transform(self, attributes, target="category"):
+    def add_classifier(self, clf):
+        self.clf = clf
+    
+    def fit_transform(self, attributes, target=None):
         X = []
         # vectorize tag, class and property
         for col in ["tag", "class", "property"]:
@@ -55,7 +58,7 @@ class XMLV:
         # vectorize text if necessary
         if self.vectorize_text:
             x, vectorizer = fit_transform(
-                attributes["text"],
+                attributes["text"].fillna(""),
                 min_df=self.min_df,
                 tokenize=True)
             self.vectorizers["text"] = vectorizer
@@ -64,7 +67,7 @@ class XMLV:
         # vectorize text if necessary
         if self.vectorize_link:
             x, vectorizer = link_fit_transform(
-                attributes["href"],
+                attributes["href"].fillna(""),
                 min_df=self.attr_min_df)
             self.vectorizers["href"] = vectorizer
             X.append(x)
@@ -81,20 +84,33 @@ class XMLV:
 
             Y = []
             for category in attributes[target]:
-                vec = np.zeros((n_categories,), dtype=np.bool_)
-                vec[category2id[category]] = 1
-                Y.append(vec)
+                # vec = np.zeros((n_categories,), dtype=np.bool_)
+                # vec[category2id[category]] = 1
+                Y.append(category2id[category])
             Y = np.array(Y)
+
+            if hasattr(self, "clf"):
+                print("Training classifier")
+                self.clf.fit(X, Y)
+                print("accuracy: ", self.clf.score(X, Y))
             return X, Y
         return X
     
     def vectorize(self, attributes):
         X = []
         for col, vectorizer in self.vectorizers.items():
-            data = vectorizer.transform(attributes[col]).todense()
+            if col in ["text", "href"]:
+                data = vectorizer.transform(
+                    attributes[col].fillna("")).todense()
+            else:
+                data = vectorizer.transform(attributes[col]).todense()
             X.append(data)
         X = np.concatenate(X, axis=-1)
         return X
+    
+    def predict(self, attributes):
+        X = self.vectorize(attributes)
+        return self.clf.predict(X)
 
 
 def get_attributes(element_id, element):
@@ -119,11 +135,12 @@ def get_attributes(element_id, element):
 
 
 def to_networkx(root):
-    elements = set([
-        elem
-        for elem in root.iter()
-        if not isinstance(elem, html.HtmlComment)
-    ])
+    elements = sorted(list(set([
+            elem
+            for elem in root.iter()
+            if not isinstance(elem, html.HtmlComment)
+        ])),
+        key=sorter)
     elements_id = set()
 
     attributes = []
@@ -164,3 +181,8 @@ def none_to_empty(x):
     if x is None:
         return ""
     return x
+
+
+def sorter(x):
+    return str(x)
+
