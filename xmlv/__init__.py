@@ -46,7 +46,7 @@ class XMLV:
     def add_classifier(self, clf):
         self.clf = clf
     
-    def fit_transform(self, attributes, target=None):
+    def fit_transform(self, attributes, target=None, G=None):
         X = []
         # vectorize tag, class and property
         for col in ["tag", "class", "property"]:
@@ -91,8 +91,11 @@ class XMLV:
 
             if hasattr(self, "clf"):
                 print("Training classifier")
-                self.clf.fit(X, Y)
-                print("accuracy: ", self.clf.score(X, Y))
+                if G is None:
+                    self.clf.fit(X, Y)
+                    print("accuracy: ", self.clf.score(X, Y))
+                else:
+                    self.clf.fit(G, X, Y)
             return X, Y
         return X
     
@@ -108,9 +111,13 @@ class XMLV:
         X = np.concatenate(X, axis=-1)
         return X
     
-    def predict(self, attributes):
+    def predict(self, attributes, G=None):
         X = self.vectorize(attributes)
-        return self.clf.predict(X)
+        print(X.shape)
+        if G is None:
+            return self.clf.predict(X)
+        else:
+            return self.clf.predict(G, X)
 
 
 def get_attributes(element_id, element):
