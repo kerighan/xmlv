@@ -13,13 +13,15 @@ class XMLV:
         min_df=5,
         vectorize_text=False,
         vectorize_link=False,
-        attr_min_df=2
+        attr_min_df=2,
+        robust_scaler=True
     ):
         self.vectorizers = {}
         self.min_df = min_df
         self.vectorize_text = vectorize_text
         self.vectorize_link = vectorize_link
         self.attr_min_df = attr_min_df
+        self.robust_scaler = robust_scaler
     
     # =========================================================================
     # model persistence
@@ -86,11 +88,10 @@ class XMLV:
 
         # concatenate all features vectors
         X = np.concatenate(X, axis=-1)
-        
+
         if target in attributes.columns:
             # create category mapping
             categories = set(attributes[target])
-            n_categories = len(categories)
             category2id = {
                 category: i
                 for i, category in enumerate(categories)
@@ -101,6 +102,12 @@ class XMLV:
             for category in attributes[target]:
                 Y.append(category2id[category])
             Y = np.array(Y)
+    
+            # robustscale if needed
+            if self.robust_scaler:
+                from sklearn.preprocessing import RobustScaler
+                self.scaler = RobustScaler()
+                X = self.scaler.fit_transform(X, Y)
 
             # fit classifier if exists
             if hasattr(self, "clf"):
@@ -111,8 +118,14 @@ class XMLV:
                 else:
                     self.clf.fit(G, X, Y)
             return X, Y
+
+        # robustscale if needed
+        if self.robust_scaler:
+            from sklearn.preprocessing import RobustScaler
+            self.scaler = RobustScaler(unit_variance=False)
+            X = self.scaler.fit_transform(X)
         return X
-    
+
     def vectorize(self, attributes):
         # serialize data if needed
         for col in ["tag", "id", "class", "property"]:
@@ -129,11 +142,15 @@ class XMLV:
                 data = vectorizer.transform(attributes[col]).todense()
             X.append(data)
         X = np.concatenate(X, axis=-1)
+
+        if self.robust_scaler:
+            X = self.scaler.transform(X)
         return X
     
     def predict(self, attributes, G=None):
         X = self.vectorize(attributes)
         if G is None:
+            # use sklearn classifier
             return self.clf.predict(X)
         else:
             # use GCN if graph is provided

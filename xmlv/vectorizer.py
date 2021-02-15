@@ -17,8 +17,7 @@ def fit_transform(series, min_df=1, tokenize=False):
 def link_fit_transform(series, min_df=1):
     vectorizer = CountVectorizer(
         min_df=min_df,
-        tokenizer=lambda x: re.split(r'[\/\_\-\?\.]', x),
+        tokenizer=lambda x: re.split(r'[\/\_\-\?\.\:]', x),
         preprocessor=lambda x: x)
     X = vectorizer.fit_transform(series).todense()
     return X, vectorizer
-
