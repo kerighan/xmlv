@@ -48,7 +48,7 @@ def to_networkx(root):
 
     # create html graph
     G = nx.Graph()
-    G.add_nodes_from(elements_id)
+    G.add_nodes_from(attributes["index"].tolist())
     edges = []
     for source in elements:
         source_id = str(source)
