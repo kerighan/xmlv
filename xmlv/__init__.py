@@ -1,10 +1,11 @@
-from .preprocessing import get_attributes, to_networkx
-from .vectorizer import fit_transform, link_fit_transform
-from sklearn.feature_extraction.text import CountVectorizer
 from io import StringIO
-from lxml import html
+
 import numpy as np
 import requests
+from lxml import html
+
+from .preprocessing import to_networkx
+from .vectorizer import fit_transform, link_fit_transform
 
 
 class XMLV:
@@ -14,35 +15,45 @@ class XMLV:
         vectorize_text=False,
         vectorize_link=False,
         attr_min_df=2,
-        robust_scaler=True
+        text_min_df=5,
+        scale=False,
+        structural=True,
+        structural_dim=50,
+        walk_len=3,
+        tfidf=True
     ):
         self.vectorizers = {}
         self.min_df = min_df
         self.vectorize_text = vectorize_text
         self.vectorize_link = vectorize_link
         self.attr_min_df = attr_min_df
-        self.robust_scaler = robust_scaler
-    
+        self.text_min_df = text_min_df
+        self.robust_scaler = scale
+        self.structural = structural
+        self.structural_dim = structural_dim
+        self.walk_len = walk_len
+        self.tfidf = tfidf
+
     # =========================================================================
     # model persistence
     # =========================================================================
-    
+
     def save(self, filename):
         import dill
         with open(filename, "wb") as f:
             dill.dump(self, f)
-    
+
     @staticmethod
     def load(filename):
         import dill
         with open(filename, "rb") as f:
             xmlv = dill.load(f)
         return xmlv
-    
+
     # =========================================================================
     # utils
     # =========================================================================
-    
+
     def get(self, url):
         """retrieve attributes and graph from url"""
         r = requests.get(url)
@@ -50,22 +61,22 @@ class XMLV:
         root = tree.getroot()
         attributes, G = to_networkx(root)
         return attributes, G
-    
+
     # =========================================================================
     # training and inference
     # =========================================================================
-    
+
     def add_classifier(self, clf):
         self.clf = clf
-    
-    def fit_transform(self, attributes, target=None, G=None):
+
+    def fit_transform(self, attributes, G=None, target=None):
         X = []
         # vectorize tag, class and property
         for col in ["tag", "id", "class", "property"]:
             if isinstance(attributes[col].iloc[0], str):
                 attributes[col] = attributes[col].apply(eval)
             x, vectorizer = fit_transform(
-                attributes[col], min_df=self.attr_min_df)
+                attributes[col], min_df=self.attr_min_df, tfidf=self.tfidf)
             self.vectorizers[col] = vectorizer
             X.append(x)
 
@@ -73,7 +84,8 @@ class XMLV:
         if self.vectorize_text:
             x, vectorizer = fit_transform(
                 attributes["text"].fillna(""),
-                min_df=self.min_df,
+                min_df=self.text_min_df,
+                tfidf=self.tfidf,
                 tokenize=True)
             self.vectorizers["text"] = vectorizer
             X.append(x)
@@ -85,6 +97,20 @@ class XMLV:
                 min_df=self.attr_min_df)
             self.vectorizers["href"] = vectorizer
             X.append(x)
+
+        if "position" not in attributes.columns:
+            X.append(np.zeros((len(attributes), 1,), dtype=np.float32))
+        else:
+            pos = attributes["position"].apply(
+                lambda x: x if isinstance(x, float)
+                else float(x.replace(",", "."))).values
+            np.nan_to_num(pos, copy=False)
+            X.append(pos[:, None])
+
+        if G is not None and self.structural:
+            from rolewalk import rolewalk
+            X.append(rolewalk(G, walk_len=self.walk_len,
+                              dim=self.structural_dim))
 
         # concatenate all features vectors
         X = np.concatenate(X, axis=-1)
@@ -102,7 +128,7 @@ class XMLV:
             for category in attributes[target]:
                 Y.append(category2id[category])
             Y = np.array(Y)
-    
+
             # robustscale if needed
             if self.robust_scaler:
                 from sklearn.preprocessing import RobustScaler
@@ -141,12 +167,20 @@ class XMLV:
             else:
                 data = vectorizer.transform(attributes[col]).todense()
             X.append(data)
+
+        if "position" not in attributes.columns:
+            X.append(np.zeros((len(attributes), 1), dtype=np.float32))
+        else:
+            pos = attributes["position"].astype(np.float32).values
+            np.nan_to_num(pos, copy=False)
+            X.append(pos[:, None])
+
         X = np.concatenate(X, axis=-1)
 
         if self.robust_scaler:
             X = self.scaler.transform(X)
         return X
-    
+
     def predict(self, attributes, G=None):
         X = self.vectorize(attributes)
         if G is None:

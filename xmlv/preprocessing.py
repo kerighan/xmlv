@@ -1,4 +1,5 @@
 from lxml import html, etree
+from lxml.etree import tostring
 import networkx as nx
 import pandas as pd
 import re
@@ -13,12 +14,15 @@ def get_attributes(element_id, element):
     ppty = ppty.split(":")
     ppty = [elem.lower() for elem in ppty if len(elem) > 0]
 
+    text = tostring(element,
+                    method="text",
+                    encoding="utf8").decode("utf8").strip()
     return [
         element_id,
         [element.tag],
         none_to_empty(element.get("id", "_")).split(),
         class_,
-        element.text_content().strip()[:20],
+        text,
         ppty,
         element.get("content", ""),
         element.get("href", "")
@@ -50,10 +54,20 @@ def to_networkx(root):
     G = nx.Graph()
     G.add_nodes_from(elements_id)
     edges = []
+    id2pos = {}
     for source in elements:
         source_id = str(source)
-        for target in source.getchildren():
+
+        children = source.getchildren()
+        n_children = len(children)
+        for i, target in enumerate(children):
             target_id = str(target)
+            # add positional indexing
+            if n_children == 1:
+                id2pos[target_id] = 0
+            else:
+                id2pos[target_id] = round(i / (n_children - 1), 2)
+
             if target_id in elements_id and source_id in elements_id:
                 edges.append((source_id, target_id))
         
@@ -62,7 +76,8 @@ def to_networkx(root):
         if parent_id in elements_id and source_id in elements_id:
             edges.append((parent_id, source_id))
     G.add_edges_from(set(edges))
-
+    # add positional indexing
+    attributes["position"] = attributes["index"].map(id2pos)
     return attributes, G
 
 
