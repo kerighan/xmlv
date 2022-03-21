@@ -1,8 +1,9 @@
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 import re
 
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 
-def fit_transform(series, min_df=1, tfidf=False, tokenize=False):
+
+def fit_transform(series, min_df=1, tfidf=False, tokenize=False, svd=None):
     if not tokenize:
         if tfidf:
             vectorizer = TfidfVectorizer(
@@ -19,11 +20,22 @@ def fit_transform(series, min_df=1, tfidf=False, tokenize=False):
             vectorizer = TfidfVectorizer(min_df=min_df)
         else:
             vectorizer = CountVectorizer(min_df=min_df)
-    X = vectorizer.fit_transform(series).todense()
+    if svd is not None:
+        from sklearn.decomposition import TruncatedSVD
+        from sklearn.pipeline import Pipeline
+        vectorizer = Pipeline(
+            [("vectorizer", vectorizer),
+             ("svd", TruncatedSVD(n_components=svd))])
+
+    X = vectorizer.fit_transform(series)
+    try:
+        X = X.todense()
+    except AttributeError:
+        pass
     return X, vectorizer
 
 
-def link_fit_transform(series, tfidf=False, min_df=1):
+def link_fit_transform(series, tfidf=False, svd=None, min_df=1):
     if tfidf:
         vectorizer = TfidfVectorizer(
             min_df=min_df,
@@ -34,5 +46,15 @@ def link_fit_transform(series, tfidf=False, min_df=1):
             min_df=min_df,
             tokenizer=lambda x: re.split(r'[\/\_\-\?\.\:]', x),
             preprocessor=lambda x: x)
-    X = vectorizer.fit_transform(series).todense()
+    if svd is not None:
+        from sklearn.decomposition import TruncatedSVD
+        from sklearn.pipeline import Pipeline
+        vectorizer = Pipeline(
+            [("vectorizer", vectorizer),
+             ("svd", TruncatedSVD(n_components=svd))])
+    X = vectorizer.fit_transform(series)
+    try:
+        X = X.todense()
+    except AttributeError:
+        pass
     return X, vectorizer

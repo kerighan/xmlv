@@ -1,8 +1,9 @@
-from lxml import html, etree
-from lxml.etree import tostring
+import re
+
 import networkx as nx
 import pandas as pd
-import re
+from lxml import etree, html
+from lxml.etree import tostring
 
 
 def get_attributes(element_id, element):
@@ -13,6 +14,10 @@ def get_attributes(element_id, element):
     ppty = none_to_empty(element.get("property", "_"))
     ppty = ppty.split(":")
     ppty = [elem.lower() for elem in ppty if len(elem) > 0]
+
+    itemprop = none_to_empty(element.get("itemprop", "_"))
+    if itemprop != "_":
+        ppty += [itemprop]
 
     text = tostring(element,
                     method="text",
@@ -49,6 +54,7 @@ def to_networkx(root):
         "index", "tag", "id",
         "class", "text", "property",
         "content", "href"]
+    attributes = attributes.drop_duplicates("index").reset_index(drop=True)
 
     # create html graph
     G = nx.Graph()
@@ -70,7 +76,7 @@ def to_networkx(root):
 
             if target_id in elements_id and source_id in elements_id:
                 edges.append((source_id, target_id))
-        
+
         parent = source.getparent()
         parent_id = str(parent)
         if parent_id in elements_id and source_id in elements_id:

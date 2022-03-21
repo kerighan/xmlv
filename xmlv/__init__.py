@@ -14,6 +14,8 @@ class XMLV:
         min_df=5,
         vectorize_text=False,
         vectorize_link=False,
+        svd_text=50,
+        svd_link=50,
         attr_min_df=2,
         text_min_df=5,
         scale=False,
@@ -26,6 +28,8 @@ class XMLV:
         self.min_df = min_df
         self.vectorize_text = vectorize_text
         self.vectorize_link = vectorize_link
+        self.svd_text = svd_text
+        self.svd_link = svd_link
         self.attr_min_df = attr_min_df
         self.text_min_df = text_min_df
         self.robust_scaler = scale
@@ -60,6 +64,7 @@ class XMLV:
         tree = html.parse(StringIO(r.text))
         root = tree.getroot()
         attributes, G = to_networkx(root)
+        G.url = url
         return attributes, G
 
     # =========================================================================
@@ -75,6 +80,8 @@ class XMLV:
         for col in ["tag", "id", "class", "property"]:
             if isinstance(attributes[col].iloc[0], str):
                 attributes[col] = attributes[col].apply(eval)
+            attributes[col] = attributes[col].apply(
+                lambda x: [y for y in x if isinstance(y, str)] if isinstance(x, list) else x)
             x, vectorizer = fit_transform(
                 attributes[col], min_df=self.attr_min_df, tfidf=self.tfidf)
             self.vectorizers[col] = vectorizer
@@ -86,6 +93,7 @@ class XMLV:
                 attributes["text"].fillna(""),
                 min_df=self.text_min_df,
                 tfidf=self.tfidf,
+                svd=self.svd_text,
                 tokenize=True)
             self.vectorizers["text"] = vectorizer
             X.append(x)
@@ -94,6 +102,7 @@ class XMLV:
         if self.vectorize_link:
             x, vectorizer = link_fit_transform(
                 attributes["href"].fillna(""),
+                svd=self.svd_link,
                 min_df=self.attr_min_df)
             self.vectorizers["href"] = vectorizer
             X.append(x)
@@ -152,20 +161,26 @@ class XMLV:
             X = self.scaler.fit_transform(X)
         return X
 
-    def vectorize(self, attributes):
+    def transform(self, attributes, G=None):
         # serialize data if needed
         for col in ["tag", "id", "class", "property"]:
             if isinstance(attributes[col].iloc[0], str):
                 attributes[col] = attributes[col].apply(eval)
+            attributes[col] = attributes[col].apply(
+                lambda x: [y for y in x if isinstance(y, str)] if isinstance(x, list) else x)
 
         # create feature vectors
         X = []
         for col, vectorizer in self.vectorizers.items():
             if col in ["text", "href"]:
                 data = vectorizer.transform(
-                    attributes[col].fillna("")).todense()
+                    attributes[col].fillna(""))
             else:
-                data = vectorizer.transform(attributes[col]).todense()
+                data = vectorizer.transform(attributes[col])
+            try:
+                data = data.todense()
+            except AttributeError:
+                pass
             X.append(data)
 
         if "position" not in attributes.columns:
@@ -175,7 +190,12 @@ class XMLV:
             np.nan_to_num(pos, copy=False)
             X.append(pos[:, None])
 
-        X = np.concatenate(X, axis=-1)
+        if G is not None and self.structural:
+            from rolewalk import rolewalk
+            X.append(rolewalk(G, walk_len=self.walk_len,
+                              dim=self.structural_dim))
+
+        X = np.hstack(X)
 
         if self.robust_scaler:
             X = self.scaler.transform(X)
@@ -189,3 +209,17 @@ class XMLV:
         else:
             # use GCN if graph is provided
             return self.clf.predict(G, X)
+
+    def store(self, attr, G, filename):
+        import os
+        import pickle
+
+        data = {"attr": attr, "G": G, "url": G.url}
+        if not os.path.exists(filename):
+            os.makedirs(filename)
+        with open(f"{filename}/data.p", "wb") as f:
+            pickle.dump(data, f)
+
+        attr["content"] = attr["content"].apply(lambda x: str(x)[:15])
+        attr["href"] = attr["href"].apply(lambda x: str(x)[:10])
+        attr.to_csv(f"{filename}.csv")
