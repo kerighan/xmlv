@@ -14,8 +14,9 @@ class XMLV:
         min_df=5,
         vectorize_text=False,
         vectorize_link=False,
-        svd_text=50,
+        svd_text=100,
         svd_link=50,
+        svd_property=50,
         attr_min_df=2,
         text_min_df=5,
         scale=False,
@@ -30,6 +31,7 @@ class XMLV:
         self.vectorize_link = vectorize_link
         self.svd_text = svd_text
         self.svd_link = svd_link
+        self.svd_property = svd_property
         self.attr_min_df = attr_min_df
         self.text_min_df = text_min_df
         self.robust_scaler = scale
@@ -83,7 +85,7 @@ class XMLV:
             attributes[col] = attributes[col].apply(
                 lambda x: [y for y in x if isinstance(y, str)] if isinstance(x, list) else x)
             x, vectorizer = fit_transform(
-                attributes[col], min_df=self.attr_min_df, tfidf=self.tfidf)
+                attributes[col], min_df=self.attr_min_df, tfidf=self.tfidf, svd=self.svd_property)
             self.vectorizers[col] = vectorizer
             X.append(x)
 
@@ -123,6 +125,7 @@ class XMLV:
 
         # concatenate all features vectors
         X = np.concatenate(X, axis=-1)
+        print(X.shape, "concat")
 
         if target in attributes.columns:
             # create category mapping
@@ -143,6 +146,7 @@ class XMLV:
                 from sklearn.preprocessing import RobustScaler
                 self.scaler = RobustScaler()
                 X = self.scaler.fit_transform(X, Y)
+                print(X.shape, "scaled")
 
             # fit classifier if exists
             if hasattr(self, "clf"):
@@ -167,7 +171,7 @@ class XMLV:
             if isinstance(attributes[col].iloc[0], str):
                 attributes[col] = attributes[col].apply(eval)
             attributes[col] = attributes[col].apply(
-                lambda x: [y for y in x if isinstance(y, str)] if isinstance(x, list) else x)
+                lambda x: [y.lower() for y in x if isinstance(y, str)] if isinstance(x, list) else x.lower())
 
         # create feature vectors
         X = []
@@ -190,15 +194,21 @@ class XMLV:
             np.nan_to_num(pos, copy=False)
             X.append(pos[:, None])
 
-        if G is not None and self.structural:
-            from rolewalk import rolewalk
-            X.append(rolewalk(G, walk_len=self.walk_len,
-                              dim=self.structural_dim))
-
-        X = np.hstack(X)
-
         if self.robust_scaler:
+            X = np.hstack(X)
             X = self.scaler.transform(X)
+
+            if G is not None and self.structural:
+                from rolewalk import rolewalk
+                X_2 = rolewalk(G, walk_len=self.walk_len,
+                               dim=self.structural_dim)
+                X = np.hstack([X, X_2])
+        else:
+            if G is not None and self.structural:
+                from rolewalk import rolewalk
+                X.append(rolewalk(G, walk_len=self.walk_len,
+                                  dim=self.structural_dim))
+            X = np.hstack(X)
         return X
 
     def predict(self, attributes, G=None):

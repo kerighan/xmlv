@@ -4,6 +4,9 @@ from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 
 
 def fit_transform(series, min_df=1, tfidf=False, tokenize=False, svd=None):
+    # lower series
+    series = series.apply(lambda x: [y.lower() for y in x]
+                          if isinstance(x, list) else x.lower())
     if not tokenize:
         if tfidf:
             vectorizer = TfidfVectorizer(
@@ -36,6 +39,9 @@ def fit_transform(series, min_df=1, tfidf=False, tokenize=False, svd=None):
 
 
 def link_fit_transform(series, tfidf=False, svd=None, min_df=1):
+    # lower series
+    series = series.apply(lambda x: [y.lower() for y in x]
+                          if isinstance(x, list) else x.lower())
     if tfidf:
         vectorizer = TfidfVectorizer(
             min_df=min_df,
