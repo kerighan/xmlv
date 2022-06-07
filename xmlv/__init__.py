@@ -63,7 +63,10 @@ class XMLV:
     def get(self, url):
         """retrieve attributes and graph from url"""
         r = requests.get(url)
-        tree = html.parse(StringIO(r.text))
+        return self.parse(r.text, url)
+
+    def parse(self, text, url=None):
+        tree = html.parse(StringIO(text))
         root = tree.getroot()
         attributes, G = to_networkx(root)
         G.url = url
@@ -125,7 +128,6 @@ class XMLV:
 
         # concatenate all features vectors
         X = np.concatenate(X, axis=-1)
-        print(X.shape, "concat")
 
         if target in attributes.columns:
             # create category mapping
@@ -146,7 +148,6 @@ class XMLV:
                 from sklearn.preprocessing import RobustScaler
                 self.scaler = RobustScaler()
                 X = self.scaler.fit_transform(X, Y)
-                print(X.shape, "scaled")
 
             # fit classifier if exists
             if hasattr(self, "clf"):

@@ -13,8 +13,14 @@ class Article:
 
     def get(self, url):
         # from dateparser import parse
-
         attr, G = self.xmlv.get(url)
+        return self.extract(attr, G)
+
+    def from_html(self, html, url=None):
+        attr, G = self.xmlv.parse(html, url=url)
+        return self.extract(attr, G)
+
+    def extract(self, attr, G):
         X = self.xmlv.transform(attr, G)
         attr["out"] = self.model(X)
         attr["content"] = attr.apply(
@@ -56,7 +62,7 @@ class Article:
             date = max(date, key=len)
         else:
             date = None
-        return {
+        res = {
             "title": title,
             "description": description,
             "content": content,
@@ -65,3 +71,6 @@ class Article:
             "section": section,
             "authors": authors
         }
+        if hasattr(G, "url"):
+            res["url"] = G.url
+        return res
