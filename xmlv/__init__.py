@@ -3,10 +3,21 @@ from io import StringIO
 import numpy as np
 import requests
 from lxml import html
+from rolewalk import RoleWalk
 
 from .preprocessing import to_networkx
 from .vectorizer import fit_transform, link_fit_transform
 
+headers = {
+    "Accept": ("text/html,application/xhtml+xml,application/xml;q=0.9,"
+               "image/webp,*/*;q=0.8"),
+    "Accept-Language": "fr,fr-FR;q=0.8,en-US;q=0.5,en;q=0.3",
+    "Connection": "keep-alive",
+    "User-Agent": ("Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) "
+                   "Gecko/20100101 Firefox/73.0"),
+    "TE": "Trailers",
+    "Cache-Control": "max-age=0"
+}
 
 class XMLV:
     def __init__(
@@ -20,7 +31,7 @@ class XMLV:
         attr_min_df=2,
         text_min_df=5,
         scale=False,
-        structural=True,
+        use_structural=True,
         structural_dim=50,
         walk_len=3,
         tfidf=True
@@ -35,7 +46,7 @@ class XMLV:
         self.attr_min_df = attr_min_df
         self.text_min_df = text_min_df
         self.robust_scaler = scale
-        self.structural = structural
+        self.use_structural = use_structural
         self.structural_dim = structural_dim
         self.walk_len = walk_len
         self.tfidf = tfidf
@@ -62,7 +73,7 @@ class XMLV:
 
     def get(self, url):
         """retrieve attributes and graph from url"""
-        r = requests.get(url)
+        r = requests.get(url, headers=headers)
         return self.parse(r.text, url)
 
     def parse(self, text, url=None):
@@ -121,10 +132,11 @@ class XMLV:
             np.nan_to_num(pos, copy=False)
             X.append(pos[:, None])
 
-        if G is not None and self.structural:
-            from rolewalk import rolewalk
-            X.append(rolewalk(G, walk_len=self.walk_len,
-                              dim=self.structural_dim))
+        if G is not None and self.use_structural:
+            rolewalk = RoleWalk(walk_len=self.walk_len,
+                                embedding_dim=self.structural_dim)
+            X_structural = rolewalk.fit_transform(G)
+            X.append(X_structural)
 
         # concatenate all features vectors
         X = np.concatenate(X, axis=-1)
@@ -200,15 +212,15 @@ class XMLV:
             X = self.scaler.transform(X)
 
             if G is not None and self.structural:
-                from rolewalk import rolewalk
-                X_2 = rolewalk(G, walk_len=self.walk_len,
-                               dim=self.structural_dim)
+                rolewalk = RoleWalk(walk_len=self.walk_len,
+                                    embedding_dim=self.structural_dim)
+                X_2 = rolewalk.fit_transform(G)
                 X = np.hstack([X, X_2])
         else:
-            if G is not None and self.structural:
-                from rolewalk import rolewalk
-                X.append(rolewalk(G, walk_len=self.walk_len,
-                                  dim=self.structural_dim))
+            if G is not None and self.use_structural:
+                rolewalk = RoleWalk(walk_len=self.walk_len,
+                                    embedding_dim=self.structural_dim)
+                X.append(rolewalk.fit_transform(G))
             X = np.hstack(X)
         return X
 

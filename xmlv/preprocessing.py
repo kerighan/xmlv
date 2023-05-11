@@ -36,11 +36,20 @@ def get_attributes(element_id, element):
 
 def to_networkx(root):
     # list all html elements
-    elements = sorted(list(set([
+    # elements = sorted(list(set([
+    #     elem
+    #     for elem in root.iter()
+    #     if not isinstance(elem, html.HtmlComment)
+    # ])), key=lambda x: x.index)
+    old_elements = [
         elem
         for elem in root.iter()
         if not isinstance(elem, html.HtmlComment)
-    ])), key=str)
+    ]
+    elements = []
+    for element in old_elements:
+        if element not in elements:
+            elements.append(element)
 
     # build attributes from lxml
     elements_id = set()

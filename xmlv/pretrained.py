@@ -37,7 +37,7 @@ class Article:
             description = None
 
         title = attr[attr["out"] == "title"].content
-        title = title[~title.str.contains("\|")]
+        # title = title[~title.str.contains("\|")]
         if len(title) > 0:
             title = max(title, key=len).strip()
         else:
