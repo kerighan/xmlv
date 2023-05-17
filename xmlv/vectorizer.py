@@ -3,7 +3,7 @@ import re
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 
 
-def fit_transform(series, min_df=1, tfidf=False, tokenize=False, svd=None):
+def fit_transform(series, min_df=1, tfidf=False, tokenize=False, svd=None, max_features=None):
     # lower series
     series = series.apply(lambda x: [y.lower() for y in x]
                           if isinstance(x, list) else x.lower())
@@ -12,17 +12,19 @@ def fit_transform(series, min_df=1, tfidf=False, tokenize=False, svd=None):
             vectorizer = TfidfVectorizer(
                 min_df=min_df,
                 preprocessor=lambda x: x,
-                tokenizer=lambda x: x)
+                tokenizer=lambda x: x,
+                max_features=max_features)
         else:
             vectorizer = CountVectorizer(
                 min_df=min_df,
                 preprocessor=lambda x: x,
-                tokenizer=lambda x: x)
+                tokenizer=lambda x: x,
+                max_features=max_features)
     else:
         if tfidf:
-            vectorizer = TfidfVectorizer(min_df=min_df)
+            vectorizer = TfidfVectorizer(min_df=min_df, max_features=max_features)
         else:
-            vectorizer = CountVectorizer(min_df=min_df)
+            vectorizer = CountVectorizer(min_df=min_df, max_features=max_features)
     if svd is not None:
         from sklearn.decomposition import TruncatedSVD
         from sklearn.pipeline import Pipeline
@@ -38,7 +40,7 @@ def fit_transform(series, min_df=1, tfidf=False, tokenize=False, svd=None):
     return X, vectorizer
 
 
-def link_fit_transform(series, tfidf=False, svd=None, min_df=1):
+def link_fit_transform(series, tfidf=False, svd=None, min_df=1, max_features=None):
     # lower series
     series = series.apply(lambda x: [y.lower() for y in x]
                           if isinstance(x, list) else x.lower())
@@ -46,12 +48,14 @@ def link_fit_transform(series, tfidf=False, svd=None, min_df=1):
         vectorizer = TfidfVectorizer(
             min_df=min_df,
             tokenizer=lambda x: re.split(r'[\/\_\-\?\.\:]', x),
-            preprocessor=lambda x: x)
+            preprocessor=lambda x: x,
+            max_features=max_features)
     else:
         vectorizer = CountVectorizer(
             min_df=min_df,
             tokenizer=lambda x: re.split(r'[\/\_\-\?\.\:]', x),
-            preprocessor=lambda x: x)
+            preprocessor=lambda x: x,
+            max_features=max_features)
     if svd is not None:
         from sklearn.decomposition import TruncatedSVD
         from sklearn.pipeline import Pipeline

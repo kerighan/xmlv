@@ -34,7 +34,8 @@ class XMLV:
         use_structural=True,
         structural_dim=50,
         walk_len=3,
-        tfidf=True
+        tfidf=True,
+        max_features = None
     ):
         self.vectorizers = {}
         self.min_df = min_df
@@ -50,6 +51,10 @@ class XMLV:
         self.structural_dim = structural_dim
         self.walk_len = walk_len
         self.tfidf = tfidf
+        if max_features is None :
+            self.max_features  = {"text": 10000, "id": 500, "tag":500, "class":500, "property":500, "href":500}
+        else :
+            self.max_features = max_features
 
     # =========================================================================
     # model persistence
@@ -99,7 +104,7 @@ class XMLV:
             attributes[col] = attributes[col].apply(
                 lambda x: [y for y in x if isinstance(y, str)] if isinstance(x, list) else x)
             x, vectorizer = fit_transform(
-                attributes[col], min_df=self.attr_min_df, tfidf=self.tfidf, svd=self.svd_property)
+                attributes[col], min_df=self.attr_min_df, tfidf=self.tfidf, svd=self.svd_property, max_features = self.max_features[col])
             self.vectorizers[col] = vectorizer
             X.append(x)
 
@@ -110,7 +115,8 @@ class XMLV:
                 min_df=self.text_min_df,
                 tfidf=self.tfidf,
                 svd=self.svd_text,
-                tokenize=True)
+                tokenize=True,
+                max_features = self.max_features["text"])
             self.vectorizers["text"] = vectorizer
             X.append(x)
 
@@ -119,7 +125,8 @@ class XMLV:
             x, vectorizer = link_fit_transform(
                 attributes["href"].fillna(""),
                 svd=self.svd_link,
-                min_df=self.attr_min_df)
+                min_df=self.attr_min_df, 
+                max_features = self.max_features["href"])
             self.vectorizers["href"] = vectorizer
             X.append(x)
 
@@ -135,7 +142,7 @@ class XMLV:
         if G is not None and self.use_structural:
             rolewalk = RoleWalk(walk_len=self.walk_len,
                                 embedding_dim=self.structural_dim)
-            X_structural = rolewalk.fit_transform(G)
+            X_structural = rolewalk.transform(G)
             X.append(X_structural)
 
         # concatenate all features vectors
@@ -214,13 +221,13 @@ class XMLV:
             if G is not None and self.structural:
                 rolewalk = RoleWalk(walk_len=self.walk_len,
                                     embedding_dim=self.structural_dim)
-                X_2 = rolewalk.fit_transform(G)
+                X_2 = rolewalk.transform(G)
                 X = np.hstack([X, X_2])
         else:
             if G is not None and self.use_structural:
                 rolewalk = RoleWalk(walk_len=self.walk_len,
                                     embedding_dim=self.structural_dim)
-                X.append(rolewalk.fit_transform(G))
+                X.append(rolewalk.transform(G))
             X = np.hstack(X)
         return X
 
