@@ -19,23 +19,24 @@ headers = {
     "Cache-Control": "max-age=0"
 }
 
+
 class XMLV:
     def __init__(
-        self,
-        min_df=5,
-        vectorize_text=False,
-        vectorize_link=False,
-        svd_text=100,
-        svd_link=50,
-        svd_property=50,
-        attr_min_df=2,
-        text_min_df=5,
-        scale=False,
-        use_structural=True,
-        structural_dim=50,
-        walk_len=3,
-        tfidf=True,
-        max_features = None
+            self,
+            min_df=5,
+            vectorize_text=False,
+            vectorize_link=False,
+            svd_text=100,
+            svd_link=50,
+            svd_property=50,
+            attr_min_df=2,
+            text_min_df=5,
+            scale=False,
+            use_structural=True,
+            structural_dim=50,
+            walk_len=3,
+            tfidf=True,
+            max_features=None
     ):
         self.vectorizers = {}
         self.min_df = min_df
@@ -51,10 +52,11 @@ class XMLV:
         self.structural_dim = structural_dim
         self.walk_len = walk_len
         self.tfidf = tfidf
-        if max_features is None :
-            self.max_features  = {"text": 10000, "id": 500, "tag":500, "class":500, "property":500, "href":500}
-        else :
-            self.max_features = max_features
+
+        self.max_features = {"text": None, "id": None, "tag": None, "class": None, "property": None, "href": None}
+        if max_features is not None:
+            for key, val in max_features.items():
+                self.max_features[key] = val
 
     # =========================================================================
     # model persistence
@@ -85,6 +87,7 @@ class XMLV:
         tree = html.parse(StringIO(text))
         root = tree.getroot()
         attributes, G = to_networkx(root)
+        G.root = root
         G.url = url
         return attributes, G
 
@@ -104,7 +107,8 @@ class XMLV:
             attributes[col] = attributes[col].apply(
                 lambda x: [y for y in x if isinstance(y, str)] if isinstance(x, list) else x)
             x, vectorizer = fit_transform(
-                attributes[col], min_df=self.attr_min_df, tfidf=self.tfidf, svd=self.svd_property, max_features = self.max_features[col])
+                attributes[col], min_df=self.attr_min_df, tfidf=self.tfidf, svd=self.svd_property,
+                max_features=self.max_features[col])
             self.vectorizers[col] = vectorizer
             X.append(x)
 
@@ -116,7 +120,7 @@ class XMLV:
                 tfidf=self.tfidf,
                 svd=self.svd_text,
                 tokenize=True,
-                max_features = self.max_features["text"])
+                max_features=self.max_features["text"])
             self.vectorizers["text"] = vectorizer
             X.append(x)
 
@@ -125,8 +129,8 @@ class XMLV:
             x, vectorizer = link_fit_transform(
                 attributes["href"].fillna(""),
                 svd=self.svd_link,
-                min_df=self.attr_min_df, 
-                max_features = self.max_features["href"])
+                min_df=self.attr_min_df,
+                max_features=self.max_features["href"])
             self.vectorizers["href"] = vectorizer
             X.append(x)
 
